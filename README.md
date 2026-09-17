@@ -252,12 +252,37 @@ sqlite3 ~/.local/share/claude-spend/usage.db \
 - **Is the agent loaded?** `brew services info claude-spend`, or
   `launchctl print gui/$(id -u)/com.claude-spend.collector | head`
 - **Homebrew and checkout installs both present**: they fight over the port. Run
-  `./scripts/uninstall.sh` or `brew services stop claude-spend` so only one is loaded.
+  `./scripts/switch.sh dev` or `./scripts/switch.sh brew` so only one is loaded.
 
 ## Dev
 
 ```sh
 uv run pytest
-uv run claude-spend collector -v --port 4319 --db /tmp/test.db
-brew install --HEAD --build-from-source johanvalentini/claude-spend/claude-spend  # formula against main
+uv run claude-spend tui                                                  # TUI from the checkout, no install needed
+uv run claude-spend collector -v --port 4319 --db /tmp/test.db           # throwaway collector next to the live one
+launchctl kickstart -k gui/$(id -u)/com.claude-spend.collector           # restart the checkout collector after a code change
 ```
+
+### Developing vs trying the real Homebrew package
+
+Both install modes listen on the same port and share `~/.claude/settings.json`,
+`~/.config/claude-spend/config` and the database, so only one collector may be loaded at
+a time. `scripts/switch.sh` stops one and starts the other; nothing else needs to change
+and history carries over.
+
+```sh
+./scripts/switch.sh status        # which one is loaded, and whether /health answers
+./scripts/switch.sh brew          # stop the checkout agent, brew install (if needed) and start the bottle
+./scripts/switch.sh brew --head   # same, but build the current origin/main from git
+./scripts/switch.sh dev           # brew services stop, then ./scripts/install.sh for this checkout
+```
+
+Day to day, stay on `dev`: the launchd agent runs `uv run` from this directory, so a code
+change is live after the `kickstart` above (re-run `./scripts/install.sh` after a
+dependency change). Switch to `brew` to check a release the way a user gets it, or to
+`brew --head` to check the formula itself. Note that `--head` builds what is pushed to
+`main`, not your working tree. Switch back with `dev` when done; leaving both loaded is
+the one thing to avoid.
+
+`brew install --HEAD --build-from-source johanvalentini/claude-spend/claude-spend` is what
+`switch.sh brew --head` runs, if you prefer to do it by hand.
