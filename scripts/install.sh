@@ -36,6 +36,11 @@ plutil -lint -s "$PLIST_DST" || die "generated plist is invalid"
 launchctl bootout "gui/$(id -u)/com.claude-usage.collector" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.claude-usage.collector.plist"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+# bootout is asynchronous; bootstrap fails with "Input/output error" while the old job is still unloading.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || break
+    sleep 0.5
+done
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DST"
 launchctl kickstart -k "gui/$(id -u)/$LABEL"
 
