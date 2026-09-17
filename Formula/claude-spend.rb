@@ -98,7 +98,7 @@ class ClaudeSpend < Formula
 
   test do
     ENV["CLAUDE_SPEND_CONFIG"] = testpath/"config"
-    assert_match version.to_s, shell_output("#{bin}/claude-spend --version")
+    assert_match version.to_s, shell_output("#{bin}/claude-spend --version") unless head?
 
     # setup writes the endpoint to settings.json and the port to the config file
     settings = testpath/"settings.json"
