@@ -25,6 +25,7 @@ Claude Code ──OTLP http/json──▶ claude-spend-collector (launchd, :4318
 
 ```sh
 brew tap johanvalentini/claude-spend
+brew trust johanvalentini/claude-spend  # Homebrew asks this once for third-party taps
 brew install claude-spend
 brew services start claude-spend   # launchd agent on 127.0.0.1:4318, survives reboots
 claude-spend setup                 # writes the telemetry env block to ~/.claude/settings.json
