@@ -13,7 +13,7 @@ class ClaudeSpend < Formula
   desc "Local OTLP collector and TUI for Claude Code token and cost usage"
   homepage "https://github.com/johanvalentini/claude-spend"
   url "https://github.com/johanvalentini/claude-spend/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # TODO: fill in after tagging v0.1.0
+  sha256 "83431fe6ef09c09fd28cd47763e5fbd6e89a0229d6d35647675c564715fb5475"
   license "MIT"
 
   depends_on :macos
