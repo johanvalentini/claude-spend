@@ -17,8 +17,8 @@ git describe --tags --abbrev=0
 git log --oneline "$(git describe --tags --abbrev=0)..HEAD"
 ```
 
-Semver: patch for fixes, minor for new views/commands/columns, major for breaking DB or
-CLI changes. If the user did not name a version, propose one with a one-line reason and
+Semver: patch for fixes, minor for new views/commands/columns/config keys, major for breaking
+DB or CLI changes. If the user did not name a version, propose one with a one-line reason and
 use it unless they object.
 
 ## Run
@@ -31,12 +31,19 @@ Requirements: on `main`, clean tree, in sync with `origin/main`, `gh` authentica
 Homebrew present for the final verification (set `SKIP_BREW=1` to skip it). The script:
 
 1. runs the tests and `brew style`,
-2. bumps `pyproject.toml`, `src/claude_spend/__init__.py`, `uv.lock` and commits `Release vX.Y.Z`,
+2. bumps `pyproject.toml` and `uv.lock` (the package reads its version from installed
+   metadata, nothing else to edit) and commits `Release vX.Y.Z`,
 3. tags and pushes,
 4. rewrites `Formula/claude-spend.rb` (tarball url + sha256, resource blocks regenerated from
    `uv.lock`) via `scripts/update_formula.py`, commits `Formula: vX.Y.Z`, pushes,
-5. copies the formula into a fresh clone of `johanvalentini/homebrew-claude-spend` and pushes,
-6. `brew reinstall claude-spend`, `brew test`, `brew audit --strict`.
+5. pushes the formula as a branch of `johanvalentini/homebrew-claude-spend`, opens a PR,
+   waits for the tap's `brew test-bot` workflow (macOS + Linux bottles, several minutes),
+   then dispatches the tap's `brew pr-pull` workflow, which merges the PR with a `bottle do`
+   block and uploads the bottles to the tap's GitHub Releases,
+6. `brew reinstall claude-spend` (from the bottle), `brew test`, `brew audit --strict`.
+
+The formula in this repo never carries the `bottle` block; only the tap copy does. That is
+expected, do not "fix" the difference.
 
 ## If a step fails
 
@@ -52,10 +59,21 @@ The steps are ordered so that re-running after a fix is safe, except:
 - **`brew audit` complains about a resource**: a dependency without an sdist on PyPI or a
   new transitive dependency. Check `uv.lock`, then `brew update-python-resources claude-spend`
   as a second opinion.
+- **Tap CI (`brew test-bot`) fails**: read the failing job with `gh run view -R
+  johanvalentini/homebrew-claude-spend --log-failed`. A `test do` failure usually means the
+  code and the formula test drifted; fix in this repo, release a patch version. Do not merge
+  the tap PR by hand: without `pr-pull` there are no bottles and users build from source.
+- **`pr-pull` ran but the PR is not merged**: open the run in the tap's Actions tab. Re-run
+  `gh workflow run publish.yml -R johanvalentini/homebrew-claude-spend -f pull_request=N`.
+- **The formula changed in a way the old tarball cannot satisfy** (new CLI flag used in
+  `service`/`test`): this is normal, the formula ships with the release that adds the flag.
+  Verify beforehand with `brew install --HEAD --build-from-source` from the tap.
 
 ## After
 
 - The brew build is left installed. The checkout launchd agent and `brew services` both
-  want port 4318; keep only one (`brew uninstall claude-spend` or `./scripts/uninstall.sh`).
-- Report: version, both commit hashes, tag URL, and the brew test/audit result. If audit or
-  test failed, say so with the output; do not report the release as done.
+  want the same port; keep only one (`brew uninstall claude-spend` or `./scripts/uninstall.sh`).
+- Report: version, both commit hashes, tag URL, tap PR URL, whether the bottles were
+  published (the tap formula has a `bottle do` block, and the tap's GitHub Releases page has
+  a `claude-spend-X.Y.Z` release), and the brew test/audit result. If audit, test or CI
+  failed, say so with the output; do not report the release as done.

@@ -15,9 +15,6 @@ dependencies = [
 
 [project.scripts]
 claude-spend = "claude_spend.cli:main"
-claude-spend-collector = "claude_spend.collector:main"
-claude-spend-tui = "claude_spend.tui:main"
-claude-spend-report = "claude_spend.report:main"
 
 [project.urls]
 Homepage = "https://github.com/johanvalentini/claude-spend"

@@ -17,4 +17,5 @@ else
     echo "Telemetry env vars in $SETTINGS were left in place."
     echo "Re-run with --purge-settings to remove them, or delete the CLAUDE_CODE_ENABLE_TELEMETRY / OTEL_* keys by hand."
 fi
-echo "Data is still at ~/.local/share/claude-spend/usage.db; delete it yourself if you want it gone."
+echo "Data is still at ~/.local/share/claude-spend/usage.db and settings at ~/.config/claude-spend/config;"
+echo "delete them yourself if you want them gone."

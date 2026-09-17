@@ -1,6 +1,6 @@
 """OTLP/HTTP JSON receiver for Claude Code telemetry -> SQLite.
 
-Run: claude-spend-collector [--host 127.0.0.1] [--port 4318] [--db PATH]
+Run: claude-spend collector [--host 127.0.0.1] [--port 4318] [--db PATH] [--log-file PATH]
 
 Claude Code must be configured with:
   CLAUDE_CODE_ENABLE_TELEMETRY=1
@@ -15,6 +15,7 @@ import argparse
 import gzip
 import json
 import logging
+import logging.handlers
 import signal
 import sys
 import time
@@ -22,7 +23,7 @@ import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import DEFAULT_DB, DEFAULT_HOST, DEFAULT_PORT
+from . import DEFAULT_DB, DEFAULT_HOST, DEFAULT_LOG, DEFAULT_PORT
 from .db import Store
 from .otlp import event_name, iter_log_records, iter_metric_points
 from .pricing import estimate_cost_usd
@@ -188,12 +189,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--host", default=DEFAULT_HOST)
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--db", type=Path, default=DEFAULT_DB)
+    ap.add_argument(
+        "--log-file",
+        type=Path,
+        default=DEFAULT_LOG,
+        help="append to this file, rotated at 5 MB keeping 3 old files (default: stderr)",
+    )
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
+    if args.log_file:
+        args.log_file.parent.mkdir(parents=True, exist_ok=True)
+        handler: logging.Handler = logging.handlers.RotatingFileHandler(
+            args.log_file, maxBytes=5 * 1024 * 1024, backupCount=3
+        )
+    else:
+        handler = logging.StreamHandler(sys.stderr)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        stream=sys.stderr,
+        handlers=[handler],
     )
     serve(args.host, args.port, args.db)
     return 0

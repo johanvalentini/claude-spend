@@ -1,6 +1,6 @@
 """Plain-text cost attribution report for cron/launchd or a quick terminal check.
 
-Run: claude-spend-report [--days N] [--db PATH] [--json]
+Run: claude-spend report [--days N] [--db PATH] [--json]
 
 Prints the same figures as the TUI's "Where it goes" tab: ranked cost levers,
 spend by project, request source, skill, and the approximate context burden of

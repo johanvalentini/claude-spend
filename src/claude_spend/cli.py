@@ -1,12 +1,15 @@
 """claude-spend: one command wrapping the collector, TUI, report and setup.
 
 Usage:
-  claude-spend setup [--purge]     enable/disable telemetry export in ~/.claude/settings.json
+  claude-spend setup [--port N]    enable telemetry export in ~/.claude/settings.json (--purge disables)
   claude-spend collector [...]     run the OTLP receiver (normally started by launchd / brew services)
   claude-spend tui [...]           open the terminal UI
   claude-spend report [...]        print a text/JSON summary
 
 Any further arguments are passed to the subcommand; use `claude-spend <cmd> --help`.
+Settings shared by all commands live in ~/.config/claude-spend/config (KEY=VALUE):
+CLAUDE_SPEND_PORT, CLAUDE_SPEND_HOST, CLAUDE_SPEND_DB, CLAUDE_SPEND_LOG. Environment
+variables of the same name override the file.
 """
 
 from __future__ import annotations

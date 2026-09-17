@@ -1,6 +1,6 @@
 """Textual TUI for watching live Claude Code spend.
 
-Run: claude-spend-tui [--db PATH]
+Run: claude-spend tui [--db PATH]
 Keys: q quit · r refresh · d cycle history window (7/14/30 days) · 1-5 switch tab
 """
 

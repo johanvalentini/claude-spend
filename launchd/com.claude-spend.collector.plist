@@ -10,9 +10,10 @@
         <string>run</string>
         <string>--project</string>
         <string>__PROJECT__</string>
-        <string>claude-spend-collector</string>
-        <string>--port</string>
-        <string>__PORT__</string>
+        <string>claude-spend</string>
+        <string>collector</string>
+        <string>--log-file</string>
+        <string>__HOME__/Library/Logs/claude-spend-collector.log</string>
     </array>
     <key>WorkingDirectory</key>
     <string>__PROJECT__</string>
@@ -29,10 +30,8 @@
     <true/>
     <key>ThrottleInterval</key>
     <integer>5</integer>
-    <key>StandardOutPath</key>
-    <string>__HOME__/Library/Logs/claude-spend-collector.log</string>
     <key>StandardErrorPath</key>
-    <string>__HOME__/Library/Logs/claude-spend-collector.log</string>
+    <string>__HOME__/Library/Logs/claude-spend-collector.stderr.log</string>
     <key>ProcessType</key>
     <string>Background</string>
 </dict>

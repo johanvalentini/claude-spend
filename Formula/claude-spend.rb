@@ -1,7 +1,8 @@
 # Homebrew formula for claude-spend.
 #
 # This file is the source of truth; scripts/release.sh copies it into the tap repo
-# (github.com/johanvalentini/homebrew-claude-spend, Formula/claude-spend.rb) on each release.
+# (github.com/johanvalentini/homebrew-claude-spend, Formula/claude-spend.rb) on each release
+# as a pull request, and the tap's CI builds bottles and adds the `bottle do` block there.
 # Do not edit url/sha256/resources by hand: `./scripts/release.sh X.Y.Z` regenerates them
 # (see .claude/skills/release/SKILL.md).
 class ClaudeSpend < Formula
@@ -12,8 +13,8 @@ class ClaudeSpend < Formula
   url "https://github.com/johanvalentini/claude-spend/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "83431fe6ef09c09fd28cd47763e5fbd6e89a0229d6d35647675c564715fb5475"
   license "MIT"
+  head "https://github.com/johanvalentini/claude-spend.git", branch: "main"
 
-  depends_on :macos
   depends_on "python@3.14"
 
   resource "markdown-it-py" do
@@ -70,18 +71,18 @@ class ClaudeSpend < Formula
     virtualenv_install_with_resources
   end
 
+  # Port, host and database path come from ~/.config/claude-spend/config, written by
+  # `claude-spend setup --port N`, so nothing here needs editing to change them.
   service do
-    run [opt_bin/"claude-spend", "collector"]
-    environment_variables CLAUDE_SPEND_PORT: "4318"
+    run [opt_bin/"claude-spend", "collector", "--log-file", var/"log/claude-spend-collector.log"]
     keep_alive true
-    log_path var/"log/claude-spend-collector.log"
-    error_log_path var/"log/claude-spend-collector.log"
+    error_log_path var/"log/claude-spend-collector.stderr.log"
     process_type :background
   end
 
   def caveats
     <<~EOS
-      Start the collector (launchd, keeps running across reboots):
+      Start the collector (launchd/systemd, keeps running across reboots):
         brew services start claude-spend
 
       Tell Claude Code to export telemetry to it (edits ~/.claude/settings.json):
@@ -89,14 +90,39 @@ class ClaudeSpend < Formula
 
       Watch:   claude-spend tui
       Report:  claude-spend report
+      Port:    claude-spend setup --port 4319 && brew services restart claude-spend
+      Logs:    #{var}/log/claude-spend-collector.log (rotated at 5 MB)
       Undo:    claude-spend setup --purge && brew services stop claude-spend
     EOS
   end
 
   test do
+    ENV["CLAUDE_SPEND_CONFIG"] = testpath/"config"
     assert_match version.to_s, shell_output("#{bin}/claude-spend --version")
+
+    # setup writes the endpoint to settings.json and the port to the config file
     settings = testpath/"settings.json"
     system bin/"claude-spend", "setup", "--settings", settings, "--port", "4999"
     assert_match "http://127.0.0.1:4999", settings.read
+    assert_match "CLAUDE_SPEND_PORT=4999", (testpath/"config").read
+
+    # the collector serves /health, creates the database and logs to the file
+    port = free_port
+    db = testpath/"usage.db"
+    log = testpath/"collector.log"
+    pid = spawn bin/"claude-spend", "collector", "--port", port.to_s, "--db", db, "--log-file", log
+    begin
+      sleep 2
+      assert_match "\"ok\": true", shell_output("curl -s http://127.0.0.1:#{port}/health")
+      assert_path_exists db
+      assert_match "listening on", log.read
+    ensure
+      Process.kill("TERM", pid)
+      Process.wait(pid)
+    end
+
+    # report reads the database; tui pulls in textual and plotext
+    assert_match "\"requests\": 0", shell_output("#{bin}/claude-spend report --json --db #{db}")
+    system libexec/"bin/python", "-c", "import claude_spend.tui"
   end
 end

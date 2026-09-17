@@ -4,7 +4,9 @@ Run: claude-spend setup [--port 4318] [--settings ~/.claude/settings.json]
      claude-spend setup --purge
 
 Writes the env block Claude Code needs into ~/.claude/settings.json. Only the
-telemetry keys are touched; everything else in the file is preserved.
+telemetry keys are touched; everything else in the file is preserved. An explicit
+--port is also saved to ~/.config/claude-spend/config so the collector, started by
+brew services or launchd, listens where Claude Code sends.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import DEFAULT_PORT
+from . import DEFAULT_PORT, config
 
 DEFAULT_SETTINGS = Path.home() / ".claude" / "settings.json"
 ENDPOINT_KEY = "OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -87,8 +89,13 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    ap.add_argument("--port", type=int, default=DEFAULT_PORT, help="collector port (default %(default)s)")
+    ap.add_argument(
+        "--port",
+        type=int,
+        help=f"collector port (default {DEFAULT_PORT}); saved to {config.path()} for the collector",
+    )
     ap.add_argument("--settings", type=Path, default=DEFAULT_SETTINGS, help="path to Claude Code settings.json")
+    ap.add_argument("--config", type=Path, default=None, help=f"claude-spend config file (default {config.path()})")
     ap.add_argument("--purge", action="store_true", help="remove the telemetry keys instead of writing them")
     ap.add_argument("--force", action="store_true", help="replace an endpoint that points somewhere else without asking")
     args = ap.parse_args(argv)
@@ -101,15 +108,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"no telemetry keys in {args.settings}")
         return 0
 
-    target = f"http://127.0.0.1:{args.port}"
+    port = args.port if args.port is not None else DEFAULT_PORT
+    target = f"http://127.0.0.1:{port}"
     existing = current_endpoint(args.settings)
     if existing and existing != target and not args.force:
         print(f"warning: {args.settings} already exports OTEL to {existing}", file=sys.stderr)
         print("         Claude Code supports a single endpoint. Re-run with --force to replace it.", file=sys.stderr)
         return 1
 
-    enable(args.port, args.settings)
+    enable(port, args.settings)
     print(f"wrote telemetry env block to {args.settings} (endpoint {target})")
+    if args.port is not None and port != int(config.load(args.config).get("CLAUDE_SPEND_PORT", "4318")):
+        cfg = config.set_values({"CLAUDE_SPEND_PORT": str(port)}, args.config)
+        print(f"wrote CLAUDE_SPEND_PORT={port} to {cfg}; restart the collector to pick it up")
     print("Already-running Claude Code sessions will not report; start a new one.")
     return 0
 

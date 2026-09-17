@@ -8,16 +8,16 @@ Nothing reads old transcripts and nothing leaves your machine: only traffic emit
 while the collector is running is stored, and the collector listens on localhost only.
 
 ```
-Claude Code ──OTLP http/json──▶ claude-spend-collector (launchd, :4318) ──▶ ~/.local/share/claude-spend/usage.db
+Claude Code ──OTLP http/json──▶ claude-spend collector (launchd, :4318) ──▶ ~/.local/share/claude-spend/usage.db
                                                                                      ▲
-                                                                  claude-spend-tui ──┘ (read-only)
+                                                                  claude-spend tui ──┘ (read-only)
 ```
 
 ## Requirements
 
-- macOS (the collector runs as a launchd user agent)
 - Claude Code CLI
-- Either [Homebrew](https://brew.sh), or [uv](https://docs.astral.sh/uv/) for the
+- Either [Homebrew](https://brew.sh) on macOS or Linux (`brew services` runs the collector
+  under launchd or systemd), or macOS with [uv](https://docs.astral.sh/uv/) for the
   checkout install (`curl -LsSf https://astral.sh/uv/install.sh | sh`; Python 3.14 is
   fetched automatically if missing).
 
@@ -31,16 +31,25 @@ brew services start claude-spend   # launchd agent on 127.0.0.1:4318, survives r
 claude-spend setup                 # writes the telemetry env block to ~/.claude/settings.json
 ```
 
+Bottles are built by the tap's CI for macOS and Linux, so `brew install` is a download;
+`brew install --HEAD claude-spend` builds the current `main` instead.
+
 `claude-spend setup` refuses to overwrite an `OTEL_EXPORTER_OTLP_ENDPOINT` that already
 points somewhere else; pass `--force` to replace it. Claude Code supports a single
 endpoint, so you would need an OTel Collector in front to fan out.
 
 Already-running Claude Code sessions will not report; start a new one.
 
-Logs go to `$(brew --prefix)/var/log/claude-spend-collector.log`. To change the port,
-edit the `CLAUDE_SPEND_PORT` value in the plist `brew services` generated
-(`~/Library/LaunchAgents/homebrew.mxcl.claude-spend.plist`), restart the service and
-re-run `claude-spend setup --port <port>`.
+Logs go to `$(brew --prefix)/var/log/claude-spend-collector.log`, rotated at 5 MB with
+three old files kept. To change the port:
+
+```sh
+claude-spend setup --port 4319       # updates settings.json and ~/.config/claude-spend/config
+brew services restart claude-spend   # the collector reads the config file at start
+```
+
+Do not edit the plist `brew services` generates; it is rewritten from the formula on every
+start. See [Configuration](#configuration) for the file.
 
 Undo:
 
@@ -51,7 +60,8 @@ brew uninstall claude-spend
 ```
 
 The formula lives in [`Formula/claude-spend.rb`](Formula/claude-spend.rb); the tap repo
-carries a copy. The release checklist is in the header of that file.
+carries a copy plus the `bottle` block its CI adds. Releases are cut with
+`scripts/release.sh` (see the header of the formula).
 
 ## Install from a checkout (uv)
 
@@ -72,7 +82,8 @@ The installer:
 
 Keep the checkout where it is: the launchd agent points at this directory. Re-run
 `./scripts/install.sh` after moving it, after `git pull`, or to change the port
-(`CLAUDE_SPEND_PORT=4319 ./scripts/install.sh`).
+(`CLAUDE_SPEND_PORT=4319 ./scripts/install.sh`, stored in `~/.config/claude-spend/config`).
+The collector logs to `~/Library/Logs/claude-spend-collector.log`, rotated at 5 MB.
 
 Already-running Claude Code sessions will not report; start a new one.
 
@@ -83,9 +94,26 @@ Already-running Claude Code sessions will not report; start a new one.
 ./scripts/uninstall.sh --purge-settings  # also remove the OTEL_* keys from ~/.claude/settings.json
 ```
 
-The database at `~/.local/share/claude-spend/usage.db` is never deleted automatically.
-A database left at the pre-rename path `~/.local/share/claude-usage/usage.db` is used as
-a fallback while the new path does not exist; move it to keep one file.
+The database at `~/.local/share/claude-spend/usage.db` and `~/.config/claude-spend/config`
+are never deleted automatically. A database left at the pre-rename path
+`~/.local/share/claude-usage/usage.db` is used as a fallback while the new path does not
+exist; move it to keep one file.
+
+## Configuration
+
+All commands read `~/.config/claude-spend/config` (or `$CLAUDE_SPEND_CONFIG`), a file of
+`KEY=VALUE` lines. Environment variables of the same name override it, command-line flags
+override both. `claude-spend setup --port N` writes the port here.
+
+```sh
+CLAUDE_SPEND_PORT=4318                    # collector port; also the endpoint setup writes
+CLAUDE_SPEND_HOST=127.0.0.1               # bind address
+CLAUDE_SPEND_DB=~/.local/share/claude-spend/usage.db
+CLAUDE_SPEND_LOG=                         # collector log file (default: stderr; the service passes --log-file)
+```
+
+Restart the collector after changing it: `brew services restart claude-spend` or
+`launchctl kickstart -k gui/$(id -u)/com.claude-spend.collector`.
 
 ## Watch
 
@@ -94,9 +122,7 @@ claude-spend tui                                   # Homebrew install
 cd ~/code/claude-spend && uv run claude-spend tui  # checkout install
 ```
 
-All commands are subcommands of `claude-spend` (`setup`, `collector`, `tui`, `report`);
-the older `claude-spend-collector`, `claude-spend-tui` and `claude-spend-report` names
-still work.
+All commands are subcommands of `claude-spend` (`setup`, `collector`, `tui`, `report`).
 
 Keys: `q` quit, `r` refresh, `d` cycle 7/14/30-day history, `1`-`5` switch tabs:
 **Overview**, **By model**, **Where it goes**, **Session timeline**, **Turns & errors**.
@@ -220,8 +246,9 @@ sqlite3 ~/.local/share/claude-spend/usage.db \
   `curl -s localhost:4318/health` and `tail ~/Library/Logs/claude-spend-collector.log`.
 - **Restart the collector**: `brew services restart claude-spend`, or for a checkout
   install `launchctl kickstart -k gui/$(id -u)/com.claude-spend.collector`
-- **Port in use**: checkout install: `CLAUDE_SPEND_PORT=4319 ./scripts/install.sh` updates
-  the plist and the settings.json endpoint. Homebrew: see the port note under *Install with Homebrew*.
+- **Port in use**: `claude-spend setup --port 4319` then restart the collector (both installs
+  read the port from `~/.config/claude-spend/config`). For the checkout install
+  `CLAUDE_SPEND_PORT=4319 ./scripts/install.sh` does both steps.
 - **Is the agent loaded?** `brew services info claude-spend`, or
   `launchctl print gui/$(id -u)/com.claude-spend.collector | head`
 - **Homebrew and checkout installs both present**: they fight over the port. Run
@@ -231,5 +258,6 @@ sqlite3 ~/.local/share/claude-spend/usage.db \
 
 ```sh
 uv run pytest
-uv run claude-spend-collector -v --port 4319 --db /tmp/test.db
+uv run claude-spend collector -v --port 4319 --db /tmp/test.db
+brew install --HEAD --build-from-source johanvalentini/claude-spend/claude-spend  # formula against main
 ```
