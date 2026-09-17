@@ -34,6 +34,8 @@ git fetch -q origin
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || die "main is not in sync with origin/main"
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
+# Fail here, before any change, if the SSH agent cannot sign (e.g. a Touch ID agent needs an interactive approval).
+git push --dry-run -q origin main 2>/dev/null || die "cannot push to origin (SSH agent/signing?); run this script in a foreground terminal"
 uv run pytest -q
 if command -v brew >/dev/null; then brew style Formula/claude-spend.rb; fi
 
@@ -91,8 +93,9 @@ gh workflow run publish.yml -R "$TAP_REPO" -f "pull_request=$PR_NUM" -f "head_sh
 sleep 10
 RUN_ID="$(gh run list -R "$TAP_REPO" --workflow publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
 gh run watch "$RUN_ID" -R "$TAP_REPO" --exit-status || die "pr-pull failed: https://github.com/$TAP_REPO/actions/runs/$RUN_ID"
-[[ "$(gh pr view "$PR_NUM" -R "$TAP_REPO" --json state --jq .state)" == "MERGED" ]] \
-    || echo "    warning: PR $PR_NUM is not marked merged; check $PR_URL"
+# pr-pull cherry-picks the commit onto main, so GitHub shows the PR as CLOSED, not MERGED.
+[[ "$(gh pr view "$PR_NUM" -R "$TAP_REPO" --json state --jq .state)" != "OPEN" ]] \
+    || echo "    warning: PR $PR_NUM is still open; check $PR_URL"
 git -C "$TAP_DIR" checkout -q main && git -C "$TAP_DIR" pull -q
 grep -q "bottle do" "$TAP_DIR/Formula/claude-spend.rb" || echo "    warning: no bottle block in the tap formula"
 

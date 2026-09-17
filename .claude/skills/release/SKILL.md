@@ -49,6 +49,8 @@ expected, do not "fix" the difference.
 
 The steps are ordered so that re-running after a fix is safe, except:
 
+- **`git push` failed with an SSH agent error**: the commit and tag exist locally. Push them
+  from a foreground shell (`git push origin main vX.Y.Z`) and continue from step 4 by hand.
 - **Tag already pushed but a later step failed**: fix the cause, then continue by hand from
   that step (the commands are in the script header). Do not delete a pushed tag unless the
   tarball was never used by the tap.
@@ -63,7 +65,8 @@ The steps are ordered so that re-running after a fix is safe, except:
   johanvalentini/homebrew-claude-spend --log-failed`. A `test do` failure usually means the
   code and the formula test drifted; fix in this repo, release a patch version. Do not merge
   the tap PR by hand: without `pr-pull` there are no bottles and users build from source.
-- **`pr-pull` ran but the PR is not merged**: open the run in the tap's Actions tab. Re-run
+- **`pr-pull` ran but the PR is still open**: open the run in the tap's Actions tab. (A
+  PR that shows as *closed* rather than *merged* is normal: pr-pull cherry-picks onto main.) Re-run
   `gh workflow run publish.yml -R johanvalentini/homebrew-claude-spend -f pull_request=N`.
 - **The formula changed in a way the old tarball cannot satisfy** (new CLI flag used in
   `service`/`test`): this is normal, the formula ships with the release that adds the flag.
