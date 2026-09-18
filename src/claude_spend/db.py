@@ -86,7 +86,7 @@ def resolve_project(session_id: str) -> str | None:
     hits = glob.glob(str(_PROJECTS_DIR / "*" / f"{session_id}.jsonl"))
     if not hits:
         return None
-    encoded = Path(hits[0]).parent.name  # e.g. -Users-<name>-code-live-usage-claude
+    encoded = Path(hits[0]).parent.name  # e.g. -Users-<name>-code-claude-spend
     parts = [p for p in encoded.split("-") if p]
     # Drop the leading /Users/<name> for a shorter label
     if len(parts) >= 2 and parts[0] == "Users":
